@@ -35,8 +35,8 @@ class ChatGPTBot(Bot, OpenAIImage):
         )
         self.args = {
             "model": conf().get("model") or "gpt-3.5-turbo",  # 对话模型的名称
-            "temperature": conf().get("temperature", 0.9),  # 值在[0,1]之间，越大表示回复越具有不确定性
-            # "max_tokens":4096,  # 回复最大的字符数
+            "temperature": conf().get("temperature", 0.3),  # 值在[0,1]之间，越大表示回复越具有不确定性
+             "max_tokens":512,  # 回复最大的字符数
             "top_p": 1,
             "frequency_penalty": conf().get(
                 "frequency_penalty", 0.0
