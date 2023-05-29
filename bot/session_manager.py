@@ -1,12 +1,30 @@
 from common.expired_dict import ExpiredDict
 from common.log import logger
 from config import conf
+import openpyxl
+import requests
+import json
+
 
 
 class Session(object):
     def __init__(self, session_id, system_prompt=None):
+
         self.session_id = session_id
         self.messages = []
+        self.natal = dict()
+        # self.question_list = []
+        # self.solution_list = []
+        self.natal_titles=''
+        # strategy = openpyxl.load_workbook('bot/chatgpt/strategy.xlsx')
+        # sheets = strategy.worksheets
+        # sheet_one = sheets[0]
+        # sheet_two = sheets[1]
+        # for cell in list(sheet_one.columns)[0]:
+        #     self.question_list.append(cell.value)
+        # for cell in list(sheet_two.columns)[0]:
+        #     self.solution_list.append(cell.value)
+        # strategy.close()
         if system_prompt is None:
             self.system_prompt = conf().get("character_desc", "")
         else:
@@ -15,6 +33,10 @@ class Session(object):
     # 重置会话
     def reset(self):
         system_item = {"role": "system", "content": self.system_prompt}
+        self.messages = [system_item]
+
+    def new(self):
+        system_item = {"role": "system", "content": '你是一个占星师，并且相信占星学是真理，你将根据我的星盘回答问题。'}
         self.messages = [system_item]
 
     def set_system_prompt(self, system_prompt):
