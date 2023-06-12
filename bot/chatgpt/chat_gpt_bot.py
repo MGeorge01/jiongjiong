@@ -42,6 +42,8 @@ def xingpan(socket_birth_data: dict):
         list(socket_birth_data.keys())[1]: list(socket_birth_data.values())[1],
         list(socket_birth_data.keys())[2]: list(socket_birth_data.values())[2],
         'is_corpus': 1,
+        'svg_type': -1,
+        'tomorrow_type': 1,
         'phase': {'0': 0.5, '180': 6, '120': 6, '90': 6, '60': 6}
        # 'phase': {'0': 0.5, '180': 6, '120': 6, '90': 6, '60': 6, '30': 2, '36': 2, '45': 2, '72': 2, '135': 0.5,
         #          '144': 2, '150': 2}
@@ -81,24 +83,36 @@ def xingpan(socket_birth_data: dict):
     natal_text = natal_text[:-1] + '。'  # 结尾改成句号
     return returned_natal, natal_text
     # else: return birth_data #如果没返回接口所需格式将直接返回输入原文，不执行任何操作
-
-
-def get_title(type: int, id1:str, id2, agree=999):
+def get_title(type: int, id1, id2, agree=999):
     house = ['', '1宫', '2宫', '3宫', '4宫', '5宫', '6宫', '7宫', '8宫', '9宫', '10宫', '11宫', '12宫']
-    sign = ['', '白羊座', '金牛座', '双子座', '巨蟹座', '狮子座', '处女座', '天秤座', '天蝎座', '射手座', '摩羯座',
-            '水瓶座', '双鱼座']
+    sign = ['白羊', '金牛', '双子', '巨蟹', '狮子', '处女', '天秤', '天蝎', '射手', '摩羯',
+            '水瓶', '双鱼']
     planet = {'0': '太阳', '1': '月亮', '2': '水星', '3': '金星', '4': '火星', '5': '木星', '6': '土星', '7': '天王',
               '8': '海王', '9': '冥王', 't': '北交', 'H': '婚神'}
     xiagnwei = {0: '合', 180: '冲', 120: '拱', 90: '刑', 60: '六合'}
     title = ''
-    title += planet[id1]
-    if type == 4:
-        title += house[id2]  # 行星落宫位
+    if type == 3:
+        title = house[id1]+sign[id2]   # 宫位星座
+    elif type == 4:
+        title = planet[id1]+house[id2]  # 行星宫位
     elif type == 5:
-        title += sign[id2]  # 行星落星座
+        title = planet[id1]+sign[id2]  # 行星星座
     elif type == 6:
-        title = title + xiagnwei[agree] + planet[id2]  # 行星相位
+        if agree == 80 or agree == 180:
+            title = planet[id1] + planet[id2] + '正'
+        else:
+            title = planet[id1] + planet[id2] + '负'  # 行星相位
     return title
+def good_or_bad(score):
+    if score=='0P':
+        score=0
+    score = int(score)
+    if score < 1:
+        return '差'
+    elif score < 5:
+        return '中'
+    else:
+        return '好'
 
 # OpenAI对话模型API (可用)
 class ChatGPTBot(Bot, OpenAIImage):
@@ -120,7 +134,7 @@ class ChatGPTBot(Bot, OpenAIImage):
         self.args = {
             "model": conf().get("model") or "gpt-3.5-turbo",  # 对话模型的名称
             "temperature": conf().get("temperature", 0.7),  # 值在[0,1]之间，越大表示回复越具有不确定性
-            "max_tokens": 512,  # 回复最大的字符数
+            "max_tokens": 1024,  # 回复最大的字符数
             "top_p": 1,
             "frequency_penalty": conf().get(
                 "frequency_penalty", 0.0
@@ -212,16 +226,17 @@ class ChatGPTBot(Bot, OpenAIImage):
             # if api_key == None, the default openai.api_key will be used
 
             if session.natal == {}:
+
                 response = openai.ChatCompletion.create(
                     api_key=api_key, messages=session.messages, **self.args
                 )
                 check=response.choices[0]["message"]["content"]
-                if "longitude" in response.choices[0]["message"]["content"]:
+                if "longitude" in check:
                     user_birth_data = json.loads(re.findall(r'{.*}', response.choices[0]["message"]["content"])[0])
                     # ex="session.add_reply(user_yuliao)"
                     session.new()
                     session.natal, session.natal_titles = xingpan(user_birth_data)
-                    session.add_reply(session.natal_titles)
+                    #session.add_reply(session.natal_titles)
                     #session.add_reply('现在我已经获得您的星盘，请问您想占星什么问题？')
                     return {
                         "total_tokens": len(session.messages[-1]["content"]),
@@ -237,7 +252,7 @@ class ChatGPTBot(Bot, OpenAIImage):
                 }
 
 
-            strategy = openpyxl.load_workbook('bot/chatgpt/strategy.xlsx')
+            strategy = openpyxl.load_workbook('bot/chatgpt/strategy - 副本.xlsx')
             sheets = strategy.worksheets
             sheet_one = sheets[0]
             sheet_two = sheets[1]
@@ -248,12 +263,12 @@ class ChatGPTBot(Bot, OpenAIImage):
             #     "completion_tokens": len(str(user_question)),
             #     "content": str(user_question)
             # } 测试星盘是否正确获取
-            question_list=[]
-            solution_list=[]
-            for cell in list(sheet_one.columns)[0]:
-                question_list.append(cell.value)
-            for cell in list(sheet_two.columns)[0]:
-                solution_list.append(cell.value)
+            # question_list=[]
+            # solution_list=[]
+            # for cell in list(sheet_one.columns)[0]:
+            #     question_list.append(cell.value)
+            # for cell in list(sheet_two.columns)[0]:
+            #     solution_list.append(cell.value)
             # return {
             #     "total_tokens": len(str(user_question)),
             #     "completion_tokens": len(str(user_question)),
@@ -288,32 +303,56 @@ class ChatGPTBot(Bot, OpenAIImage):
             question_embedding = openai.Embedding.create(input=user_question, model="text-similarity-davinci-001")['data'][0]['embedding']
             index = 0
             similarity = 0
-            for j in range(len(question_list)):
-                potential_question_embedding = openai.Embedding.create(input=question_list[j],
+            #answer_prompt=''
+            for j in range(len(list(sheet_one.columns)[0])):
+                potential_question_embedding = openai.Embedding.create(input=sheet_one.cell(j+1,1).value,
                                                                        model="text-similarity-davinci-001")['data'][0]['embedding']
                 potential_similarity = np.dot(question_embedding, potential_question_embedding)
                 if potential_similarity > 0.81 and potential_similarity > similarity:
                     similarity = potential_similarity
                     index = j+1
             if similarity > 0:
-                for i in (2, 5):
-                    if sheet_one.cell(index, i).value is not None:
-                        try:
-                            exec(sheet_one.cell(index, i).value)
-                        except:
-                            pass
+                for o in range(5, 10):
+                    if sheet_one.cell(index, o).value is not None:
+
+                        # if 'answer_prompt' in sheet_one.cell(index, o).value:
+                        #     exec(sheet_one.cell(index, o).value)
+                        exec(sheet_one.cell(index, o).value)
 
                 for t in titles:
-                    for j in range(len(solution_list)):
-                        if set(t) == set(solution_list[j]):
-                            solution += sheet_two.cell(j + 1, 2).value
+                    for j in range(1,len(list(sheet_two.columns)[0])+1):
+                        if set(t) == set(sheet_two.cell(j,1).value):
+                            solution += sheet_two.cell(j, 2).value
+            if index!=0:
+                answer_prompt = sheet_one.cell(index,2).value+str(titles)+'。'+sheet_one.cell(index,3).value+user_question+sheet_one.cell(index,4).value+solution
             strategy.close()
+
             if solution == '':
+                if len(titles)>0:
+                    title_base_generation = openai.ChatCompletion.create(
+                                            api_key=api_key,
+                                            model="gpt-3.5-turbo",
+                                            temperature=0.7,
+                                            max_tokens=512,
+                                            messages=[
+                                                {"role": "system","content": "你是一个占星师，请根据以下星象回答问题："+str(titles)},
+                                                {"role": "user", "content": user_question}
+                                            ])
+                    return {
+                        "total_tokens": len(title_base_generation.choices[0]["message"]["content"]),
+                        "completion_tokens": len(title_base_generation.choices[0]["message"]["content"]),
+                        "content": title_base_generation.choices[0]["message"]["content"]}
                 #session.new()
                 #session.add_reply(session.natal_titles)
                 response = openai.ChatCompletion.create(
-                    api_key=api_key, messages=session.messages, **self.args
-                )
+                                            api_key=api_key,
+                                            model="gpt-3.5-turbo",
+                                            temperature=0.7,
+                                            max_tokens=512,
+                                            messages=[
+                                                {"role": "system","content": "你是一个占星师，请根据以下星象回答问题："+str(session.natal_titles)},
+                                                {"role": "user", "content": user_question}
+                                            ])
                 # response = openai.ChatCompletion.create(
                 #     api_key=api_key,
                 #     model="gpt-3.5-turbo",
@@ -330,15 +369,15 @@ class ChatGPTBot(Bot, OpenAIImage):
                     "completion_tokens": response["usage"]["completion_tokens"],
                     "content": response.choices[0]["message"]["content"],
                 }
-
+            #answer_prompt = answer_prompt
             rewrite = openai.ChatCompletion.create(
                 api_key=api_key,
                 model="gpt-3.5-turbo",
                 temperature=0.7,
                 max_tokens=512,
                 messages=[
-                    {"role": "system","content": "你是一个占星师，请总结以下内容并简短回答，因为我不懂占星，所以不需要提示占星术语"},
-                    {"role": "user", "content": solution}
+                    {"role": "system","content": answer_prompt},
+                    {"role": "user", "content": user_question}
                 ])
             return {
                 "total_tokens": len(rewrite.choices[0]["message"]["content"]),
